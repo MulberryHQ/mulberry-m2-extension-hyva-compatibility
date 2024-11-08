@@ -1,0 +1,368 @@
+<?php
+/**
+ * @category Mulberry Team
+ * @package Mulberry Warranty Hyva Compatibility
+ * @author Mulberry <support@getmulberry.com>
+ * @copyright Copyright (c) 2024 Mulberry Technology Inc., Ltd (http://www.getmulberry.com)
+ * @license http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
+ */
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Magento\Framework\Escaper;
+use Magento\Quote\Api\Data\CartItemInterface;
+use Mulberry\Warranty\Block\Catalog\Product\View\Warranty\Container;
+
+/**
+ * @var Container $block
+ * @var Escaper $escaper
+ * @var ViewModelRegistry $viewModels
+ */
+
+/**
+ * @var CartItemInterface $quoteItem
+ */
+$product = $block->getProduct();
+
+if (!$product) {
+    return;
+}
+?>
+
+<script>
+    window.mulberryProductData = {
+        product: {
+            id: "<?= $block->escapeHtml($product->getSku()); ?>",
+            title: "<?= $block->escapeHtml($block->escapeQuote($product->getName())); ?>",
+            price: <?= (float)$product->getFinalPrice(); ?>,
+            url: "<?= $block->escapeUrl($product->getProductUrl()) ?>",
+            images: <?= $block->getGalleryImagesInfo(); ?>,
+            meta: {
+                breadcrumbs: <?= $block->getBreadcrumbsInfo(); ?>,
+            },
+            description: "<?= $block->escapeHtml($block->getProductDescription()); ?>"
+        },
+        activeSelection: {
+            id: "<?= $block->escapeHtml($product->getSku()); ?>",
+            title: "<?= $block->escapeHtml($block->escapeQuote($product->getName())); ?>",
+            price: <?= (float)$product->getFinalPrice(); ?>,
+            url: "<?= $block->escapeUrl($product->getProductUrl()) ?>",
+            images: <?= $block->getGalleryImagesInfo(); ?>,
+            meta: {
+                breadcrumbs: <?= $block->getBreadcrumbsInfo(); ?>,
+            },
+            description: "<?= $block->escapeHtml($block->getProductDescription()); ?>"
+        }
+    };
+
+    function initMulberryOffers() {
+        return {
+            options: {
+                productUpdateTimer: null,
+                mulberryOverlayActive: false,
+                mulberryProductUpdateDelay: 1000,
+                warrantyHashElement: '#warranty_hash',
+                warrantySkuElement: '#warranty_sku',
+                addToCartButton: '#product-addtocart-button',
+            },
+            async init($dispatch) {
+                this.dispatch = $dispatch;
+
+                await this.initMulberrySDK();
+            },
+            async initMulberrySDK() {
+                if (window.mulberry) {
+                    this.addProductListeners();
+                    await this.registerProduct();
+                } else {
+                    setTimeout(function () {
+                        this.initMulberrySDK()
+                    }.bind(this), 50);
+                }
+            },
+            getWarrantyHashElement() {
+                return document.querySelector(this.options.warrantyHashElement);
+            },
+            getWarrantySkuElement() {
+                return document.querySelector(this.options.warrantySkuElement);
+            },
+            getAddToCartButtonElement() {
+                return document.querySelector(this.options.addToCartButton);
+            },
+            addProductListeners() {
+                window.addEventListener('configurable-selection-changed', (event) => {
+                    this.updateMulberryProduct(event.detail);
+                });
+
+                this.registerAddToCartObserver();
+            },
+
+            async registerProduct() {
+                await window.mulberry.core.init({
+                    publicToken: window.mulberryConfigData.publicToken,
+                });
+
+                await this.registerOffers();
+            },
+
+            async registerOffers() {
+                const offers = await window.mulberry.core.getWarrantyOffer(window.mulberryProductData.product);
+
+                if (offers.length) {
+                    const settings = window.mulberry.core.settings;
+
+                    if (settings.has_modal) {
+                        window.mulberry.modal.init({
+                            offers,
+                            settings,
+                            placement: 'pdp',
+                            onWarrantyDecline: () => this.$dispatch('mulberry-warranty-decline'),
+                            onWarrantySelect: (warranty) => this.$dispatch('mulberry-warranty-select', warranty),
+                        });
+                    }
+
+                    if (settings.has_inline) {
+                        window.mulberry.inline.init({
+                            offers,
+                            settings,
+                            selector: '.mulberry-inline-container',
+                            onWarrantyToggle: (warranty) => this.toggleWarranty(warranty.offer, warranty.isSelected),
+                        });
+                    }
+                }
+            },
+
+            toggleWarranty(data, isSelected) {
+                const selectedWarrantyHash = data && isSelected ? data.warranty_hash : '';
+
+                this.getWarrantySkuElement().value = window.mulberryProductData.product.id;
+                this.getWarrantyHashElement().value = selectedWarrantyHash;
+            },
+
+            /**
+             * @TODO - Add custom options handler when requested
+             *
+             * @type {string}
+             */
+            prepareOptionsSku() {
+                return '';
+
+                const customOptionsHandler = this.$el.dataset.magePriceOptions;
+                if (!customOptionsHandler) return '';
+
+                const optionElements = document.querySelectorAll(customOptionsHandler.options.optionsSelector);
+                const customOptionsConfig = customOptionsHandler.options.optionConfig;
+
+                let result = '';
+
+                optionElements.forEach((element) => {
+                    const optionValue = this._getOptionSku(element, customOptionsConfig);
+                    if (optionValue !== '') {
+                        result += `-${optionValue}`;
+                    }
+                });
+
+                return result;
+            },
+
+            prepareMulberryProduct(data) {
+                try {
+                    if (data && data.productIndex) {
+                        const productId = data.productIndex;
+
+                        let sku = window.configurableJsonConfig.simple_skus[productId];
+
+                        const customOptionsSku = this.prepareOptionsSku();
+
+                        if (customOptionsSku !== '') {
+                            sku += customOptionsSku;
+                        }
+
+                        window.mulberryProductData.product = Object.assign(window.mulberryProductData.product, {
+                            id: sku,
+                            price: window.configurableJsonConfig.optionPrices[productId].finalPrice.amount,
+                        });
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            },
+
+            async updateMulberryProduct() {
+                const settings = window.mulberry?.core?.settings;
+
+                if (!window.mulberry || !settings || (!settings.has_modal && !settings.has_inline)) {
+                    return;
+                }
+
+                clearTimeout(window.mulberryProductData.productUpdateTimer);
+                window.mulberryProductData.productUpdateTimer = setTimeout(async () => {
+                    if (this.hasConfigurationChanges()) {
+                        await window.mulberry.core.getWarrantyOffer(window.mulberryProductData.activeSelection);
+                        this.updateOffers();
+
+                        document.querySelector(this.options.warrantySkuElement).value = window.mulberryProductData.activeSelection.id;
+                    }
+                }, this.options.mulberryProductUpdateDelay);
+            },
+
+            hasConfigurationChanges() {
+                const newConfig = JSON.parse(JSON.stringify(window.mulberryProductData.product)),
+                    currentConfig = window.mulberryProductData.activeSelection;
+
+                window.mulberryProductData.activeSelection = newConfig;
+
+                return JSON.stringify(currentConfig) !== JSON.stringify(newConfig);
+            },
+
+            updateOffers() {
+                const settings = window.mulberry.core.settings;
+                const offers = window.mulberry.core.offers;
+
+                if (settings.has_modal) {
+                    window.mulberry.modal.updateOffer
+                        ? window.mulberry.modal.updateOffer(offers)
+                        : window.mulberry.modal.init({
+                            offers,
+                            settings,
+                            placement: 'pdp',
+                            onWarrantyDecline: () => this.$dispatch('mulberry-warranty-decline'),
+                            onWarrantySelect: (warranty) => this.$dispatch('mulberry-warranty-select', warranty),
+                        });
+                }
+
+                if (settings.has_inline) {
+                    window.mulberry.inline.updateOffer
+                        ? window.mulberry.inline.updateOffer(offers)
+                        : window.mulberry.inline.init({
+                            offers,
+                            settings,
+                            selector: '.mulberry-inline-container',
+                            onWarrantyToggle: (warranty) => this.toggleWarranty(warranty.offer, warranty.isSelected),
+                        });
+
+                    window.mulberry.inline.deselectOffer();
+                    this.toggleWarranty(false, false);
+                }
+            },
+
+            _getOptionSku(element, optionsConfig) {
+                const optionValue = element.value;
+                const optionId = utils.findOptionId(element);
+                const optionType = element.type;
+                const optionConfig = optionsConfig[optionId];
+
+                switch (optionType) {
+                    case 'text':
+                    case 'textarea':
+                        return optionConfig.value_sku;
+                    case 'radio':
+                        return element.checked && optionConfig[optionValue]?.value_sku;
+                    case 'select-one':
+                        return optionConfig[optionValue]?.value_sku;
+                    case 'select-multiple':
+                        return Array.from(element.selectedOptions)
+                            .map((opt) => optionConfig[opt.value]?.value_sku)
+                            .join('');
+                    case 'checkbox':
+                        return element.checked && optionConfig[optionValue]?.value_sku;
+                    case 'file':
+                        return optionConfig[optionValue]?.value_sku;
+                    default:
+                        return '';
+                }
+            },
+            registerAddToCartObserver() {
+                window.addEventListener('mulberry-warranty-decline', ($event) => {
+                    window.mulberry.modal.close();
+                    this.getAddToCartButtonElement().click();
+                    this.options.mulberryOverlayActive = false;
+                });
+
+                window.addEventListener('mulberry-warranty-select', ($event) => {
+                    const warranty = $event.detail;
+
+                    this.toggleWarranty(warranty, true);
+
+                    window.mulberry.modal.close();
+                    this.getAddToCartButtonElement().click();
+                    this.options.mulberryOverlayActive = false;
+
+                    /**
+                     * Reset values for warranty elements
+                     */
+                    window.mulberry.inline.deselectOffer();
+                    this.getWarrantyHashElement().value = '';
+                });
+
+                this.getAddToCartButtonElement()
+                    .addEventListener('click', (event) => {
+                        /**
+                         * if Mulberry object does not exist - skip
+                         */
+                        if (!window.mulberry || this.options.mulberryOverlayActive) {
+                            return;
+                        }
+
+                        const hasModal = window.mulberry?.core?.settings?.has_modal;
+
+                        if (!hasModal) {
+                            return;
+                        }
+
+                        /**
+                         * If there are no Mulberry offers for the current selection - skip
+                         */
+                        const offersAvailable = window.mulberry?.core?.offers?.length > 0,
+                            modalOffersInitialized = window.mulberry?.modal?.length > 0;
+
+                        if (!offersAvailable || !modalOffersInitialized) {
+                            return;
+                        }
+
+                        /**
+                         * Toggle modal if the warranty is not selected
+                         */
+                        if (this.getWarrantyHashElement().value === '') {
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            window.mulberry.modal.open();
+                            this.options.mulberryOverlayActive = true;
+                        }
+
+                        return;
+                    })
+            }
+        };
+    }
+
+    (function () {
+        'use strict';
+
+        const customMulberryEvent = 'mulberry-product-changed',
+            selectors = 'div[x-data^=initConfigurable][x-data*=Options]'
+
+        /**
+         * @return {void}
+         */
+        const injectConfigurationChangeObserver = function () {
+            const swatches = document.querySelectorAll(selectors);
+
+            swatches.forEach(swatch => {
+                const customDispatch = `$dispatch('${customMulberryEvent}', `
+                    + `{productIndex: productIndex, element: $el, optionConfig: optionConfig})`;
+
+                let mutatedInitAttribute = swatch.getAttribute('x-init');
+                mutatedInitAttribute += `; $watch('productIndex', (productIndex) => { ${customDispatch} });`;
+                swatch.setAttribute('x-init', mutatedInitAttribute);
+            });
+        }
+
+        injectConfigurationChangeObserver();
+
+        window.addEventListener('configurable-selection-changed', ($event) => {
+            initMulberryOffers().prepareMulberryProduct($event.detail);
+        });
+    })();
+</script>

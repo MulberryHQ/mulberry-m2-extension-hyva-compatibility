@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @category Mulberry Team
+ * @package Mulberry Warranty Hyva Compatibility
+ * @author Mulberry <support@getmulberry.com>
+ * @copyright Copyright (c) 2024 Mulberry Technology Inc., Ltd (http://www.getmulberry.com)
+ * @license http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
+ */
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <update handle="mulberry_warranty_config"/>
+
+    <body>
+        <referenceContainer name="product.info.form">
+            <block class="Mulberry\Warranty\Block\Catalog\Product\View\Warranty\Container"
+                   name="warranty.product.container.simple"
+                   template="Mulberry_Warranty::catalog/product/view/warranty/container.phtml"
+                   after="-"
+            >
+                <arguments>
+                    <argument name="mulberryConfigViewModel" xsi:type="object">
+                        Mulberry\Warranty\ViewModel\ConfigViewModel
+                    </argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

@@ -1,0 +1,53 @@
+<?php
+/**
+ * @category Mulberry Team
+ * @package Mulberry Warranty Hyva Compatibility
+ * @author Mulberry <support@getmulberry.com>
+ * @copyright Copyright (c) 2024 Mulberry Technology Inc., Ltd (http://www.getmulberry.com)
+ * @license http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
+ */
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+
+/**
+ * @var Template $block
+ * @var Escaper $escaper
+ * @var ViewModelRegistry $viewModels
+ */
+?>
+<script>
+    (() => {
+        'use strict';
+
+        function initMulberrySdk() {
+            if (typeof hyva === 'undefined' || (!hyva.getBrowserStorage || !hyva.getCookie || !hyva.setCookie)) {
+                console.warn('Hyvä helpers are not loaded yet. Make sure they are included before this script');
+                return;
+            }
+
+            if (typeof window.mulberry === 'object') {
+                return; // Return as SDK script is already loaded
+            }
+
+            const scriptSource = window.mulberryConfigData.mulberryUrl + '/plugin/static/js/mulberry.js';
+            const pendingLoadScript = Array.from(document.scripts).find(script => script.src === scriptSource);
+
+            if (pendingLoadScript) {
+                return;
+            }
+
+            const script = document.createElement('script')
+            script.src = scriptSource;
+            script.async = true;
+
+            document.head.appendChild(script);
+        }
+
+        document.addEventListener('alpine:init', () => {
+            initMulberrySdk();
+        });
+    })();
+</script>

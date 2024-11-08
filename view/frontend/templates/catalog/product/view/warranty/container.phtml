@@ -1,0 +1,53 @@
+<?php
+/**
+ * @category Mulberry Team
+ * @package Mulberry Warranty Hyva Compatibility
+ * @author Mulberry <support@getmulberry.com>
+ * @copyright Copyright (c) 2024 Mulberry Technology Inc., Ltd (http://www.getmulberry.com)
+ * @license http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
+ */
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+use Mulberry\Warranty\Block\Catalog\Product\View\Warranty\Container;
+use Mulberry\Warranty\ViewModel\ConfigViewModel;
+/**
+ * @var $block Container
+ * @var $escaper Escaper
+ * @var $cartItemViewModel ConfigViewModel
+ */
+
+$cartItemViewModel = $block->getData('mulberryConfigViewModel');
+
+if (!$cartItemViewModel) {
+    return;
+}
+
+if (!$cartItemViewModel->canRender()) {
+    return;
+}
+?>
+
+<?php $product = $block->getProduct(); ?>
+<?php $buttonTitle = __('Add to Cart'); ?>
+
+<?php if ($product->isSaleable()): ?>
+    <div class="product-options-mulberry w-full min-h-[130px]"
+         x-data="initMulberryOffers"
+    >
+        <div class="box-tocart">
+            <div class="fieldset">
+                <div class="mulberry-inline-container"></div>
+                <div class="actions no-display hidden">
+                    <input type="hidden" id="warranty_hash" name="warranty[hash]" value=""/>
+                    <input type="hidden" id="warranty_sku" name="warranty[sku]" value="<?= $block->escapeHtml($product->getSku()); ?>"/>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <?= $block->getLayout()
+        ->createBlock(Container::class)
+        ->setTemplate('Mulberry_WarrantyHyvaCompatibility::js/product/mulberry_offers.phtml')
+        ->toHtml(); ?>
+<?php endif; ?>
