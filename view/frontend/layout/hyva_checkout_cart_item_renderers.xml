@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @category Mulberry Team
+ * @package Mulberry Warranty Hyva Compatibility
+ * @author Mulberry <support@getmulberry.com>
+ * @copyright Copyright (c) 2024 Mulberry Technology Inc., Ltd (http://www.getmulberry.com)
+ * @license http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
+ */
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="checkout.cart.item.renderers">
+            <referenceBlock name="checkout.cart.item.renderers.warranty" template="Magento_Checkout::php-cart/item/default.phtml"/>
+            <referenceBlock name="checkout.cart.item.renderers.warranty.actions.remove" template="Magento_Checkout::php-cart/item/renderer/actions/remove.phtml"/>
+        </referenceBlock>
+    </body>
+</page>

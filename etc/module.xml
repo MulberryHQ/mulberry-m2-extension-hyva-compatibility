@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @category Mulberry Team
+ * @package Mulberry Warranty Hyva Compatibility
+ * @author Mulberry <support@getmulberry.com>
+ * @copyright Copyright (c) 2024 Mulberry Technology Inc., Ltd (http://www.getmulberry.com)
+ * @license http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
+ */
+-->
+
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="Mulberry_WarrantyHyvaCompatibility">
+        <sequence>
+            <module name="Mulberry_Warranty"/>
+            <module name="Hyva_CompatModuleFallback"/>
+        </sequence>
+    </module>
+</config>
+

@@ -1,0 +1,58 @@
+<?php
+/**
+ * @category Mulberry Team
+ * @package Mulberry Warranty Hyva Compatibility
+ * @author Mulberry <support@getmulberry.com>
+ * @copyright Copyright (c) 2024 Mulberry Technology Inc., Ltd (http://www.getmulberry.com)
+ * @license http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
+ */
+declare(strict_types=1);
+
+use Magento\Checkout\Block\Cart\Item\Renderer;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use Mulberry\Warranty\ViewModel\CartItemViewModel;
+
+/**
+ * @var $block Renderer
+ * @var $escaper Escaper
+ * @var $cartItemViewModel CartItemViewModel
+ */
+
+$quoteItem = $block->getItem();
+$product = $quoteItem->getProduct();
+$cartItemViewModel = $block->getData('mulberryCartItemViewModel');
+
+if (!$cartItemViewModel) {
+    return;
+}
+
+$isEnabled = $cartItemViewModel->isShoppingCartOffersEnabled();
+
+if (!$isEnabled) {
+    return;
+}
+
+$isEligible = $cartItemViewModel->isEligible($quoteItem);
+
+if (!$isEligible) {
+    return;
+}
+?>
+
+<div
+    x-data="initMulberryCartItem_<?= $escaper->escapeHtml($quoteItem->getItemId()); ?>"
+>
+    <div
+        class="mulberry-cart-container"
+        id="mulberry-cart-container-<?= $escaper->escapeHtmlAttr($quoteItem->getId()) ?>"
+        data-layout="button-dark"
+    ></div>
+</div>
+
+<?= $block->getLayout()
+    ->createBlock(Template::class)
+    ->setQuoteItem($quoteItem)
+    ->setTemplate('Mulberry_WarrantyHyvaCompatibility::js/cart/mulberry_cart_item.phtml')
+    ->toHtml(); ?>
+

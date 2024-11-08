@@ -1,0 +1,23 @@
+{
+    "name": "getmulberry/mulberry-m2-extension-hyva-compatibility",
+    "description": "This module makes Mulberry Warranty module compatible with Hyv\u00e4 Themes",
+    "type": "magento2-module",
+    "version": "1.0.0",
+    "require": {
+        "php": ">=7.4.0",
+        "magento/framework": ">=102.0.0",
+        "getmulberry/mulberry-m2-extension": ">=3.0.0",
+        "hyva-themes/magento2-default-theme": ">=1.1.19",
+        "hyva-themes/magento2-compat-module-fallback": ">=1.1.2",
+        "amasty/base": ">=1.15.2"
+    },
+    "license": "proprietary",
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Mulberry\\WarrantyHyvaCompatibility\\": ""
+        }
+    }
+}

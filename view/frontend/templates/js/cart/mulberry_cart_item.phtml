@@ -1,0 +1,180 @@
+<?php
+/**
+ * @category Mulberry Team
+ * @package Mulberry Warranty Hyva Compatibility
+ * @author Mulberry <support@getmulberry.com>
+ * @copyright Copyright (c) 2024 Mulberry Technology Inc., Ltd (http://www.getmulberry.com)
+ * @license http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
+ */
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use Magento\Quote\Api\Data\CartItemInterface;
+use Mulberry\Warranty\ViewModel\CartItemViewModel;
+
+/**
+ * @var Template $block
+ * @var Escaper $escaper
+ * @var ViewModelRegistry $viewModels
+ */
+
+/**
+ * @var CartItemInterface $quoteItem
+ */
+$quoteItem = $block->getQuoteItem();
+$cartItemViewModel = $viewModels->require(CartItemViewModel::class);
+?>
+
+<script>
+    function initMulberryCartItem_<?= $escaper->escapeHtml($quoteItem->getItemId()); ?>() {
+        return {
+            options: {
+                reloadOnSuccess: true,
+                itemId: "<?= $escaper->escapeHtmlAttr($quoteItem->getId()) ?>",
+                addToCartUrl: "<?= $escaper->escapeUrl($block->getUrl('mulberry/cart/add')) ?>",
+                cartContainerPrefix: 'mulberry-cart-container-',
+                product: {
+                    id: "<?= $escaper->escapeJs($quoteItem->getSku()) ?>",
+                    title: "<?= $escaper->escapeJs($quoteItem->getName()) ?>",
+                    price: "<?= (float) $escaper->escapeJs($quoteItem->getPrice()) ?>",
+                    url: "<?= $block->getProductUrl() ?>",
+                    images: <?= $cartItemViewModel->getGalleryImagesInfo($quoteItem); ?>,
+                    meta: {
+                        breadcrumbs: <?= $cartItemViewModel->getBreadcrumbsInfo($quoteItem); ?>
+                    },
+                    description: "<?= $block->escapeHtml($cartItemViewModel->getProductDescription($quoteItem)); ?>"
+                }
+            },
+            abortController: null,
+            async init($dispatch) {
+                this.dispatch = $dispatch;
+
+                await this.initMulberrySDK();
+            },
+            async initMulberrySDK() {
+                if (window.mulberry) {
+                    await window.mulberry.core.init({
+                        publicToken: window.mulberryConfigData.publicToken
+                    });
+                    await this.initCartItemOffers();
+                } else {
+                    setTimeout(() => this.initMulberrySDK(), 50);
+                }
+            },
+            async initCartItemOffers() {
+                try {
+                    const offers = await window.mulberry.core.getWarrantyOffer(this.options.product);
+                    await this.initModalContainer(offers);
+                } catch (error) {
+                    console.error('Error initializing Mulberry cart item offers:', error);
+                }
+            },
+            async initModalContainer(offers) {
+                const settings = window.mulberry.core.settings;
+                const cartItemContainer = '#' + this.options.cartContainerPrefix + this.options.itemId;
+                if (document.querySelector(cartItemContainer)) {
+                    await window.mulberry.modalTrigger.init({
+                        placement: 'cart',
+                        offers: offers,
+                        settings,
+                        trigger: cartItemContainer,
+                        onWarrantyDecline: () => {
+                            window.mulberry.modal.close();
+                        },
+                        onWarrantySelect: (warranty) => this.addToCart(warranty, true),
+                    });
+                }
+            },
+            async addToCart(warranty, forceReload = false) {
+                if (!warranty) {
+                    this.handleError('<?= $escaper->escapeHtml(__('Malformed request, warranty is missing.')); ?>');
+
+                    return;
+                }
+
+                const { warranty_hash } = warranty;
+
+                if (!warranty_hash) {
+                    this.handleError('<?= $escaper->escapeHtml(__('Malformed request, warranty hash is missing.')); ?>');
+
+                    return;
+                }
+
+                const isCartPage = window.location.pathname.includes('checkout/cart');
+
+                try {
+                    if (this.abortController) {
+                        this.abortController.abort();
+                    }
+
+                    // ensure a new controller is used for the new request
+                    this.abortController = new AbortController();
+                    const payload = this.prepareRequestBody(warranty_hash, isCartPage || forceReload),
+                        url = this.options.addToCartUrl;
+
+                    const response = await fetch(url, {
+                        signal: this.abortController.signal,
+                        method: 'post',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: new URLSearchParams(payload),
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.status) {
+                        this.handleSuccess(result);
+                    } else {
+                        this.handleError(result.error);
+                    }
+                } catch (error) {
+                    console.error('<?= $escaper->escapeHtml(__('Error adding to cart: ')); ?>', error);
+                    this.handleError('<?= $escaper->escapeHtml(__('Sorry, there has been an error processing your request. Please try again or contact our support.')); ?>');
+                }
+            },
+            getFormKey() {
+                return hyva.getFormKey();
+            },
+            prepareRequestBody(warrantyHash, forcePageReload) {
+                const body = new FormData();
+
+                body.append('item_id', this.options.itemId);
+                body.append('force_page_reload', forcePageReload);
+                body.append('warranty[warranty_hash]', warrantyHash);
+                body.append('form_key', hyva.getFormKey());
+
+                return body;
+            },
+            handleSuccess(response) {
+                if (response.force_page_reload) {
+                    window.location.reload(false);
+                } else {
+                    typeof window.dispatchMessages !== "undefined" && window.dispatchMessages(
+                        [{
+                            type: "success",
+                            text: response.message
+                        }], 10000
+                    );
+                }
+
+                window.dispatchEvent(new Event('reload-customer-section-data'));
+
+                window.mulberry.modal.close();
+            },
+            handleError(errorMessage) {
+                typeof window.dispatchMessages !== "undefined" && window.dispatchMessages(
+                    [{
+                        type: "error",
+                        text: errorMessage
+                    }], 10000
+                );
+
+                window.mulberry.modal.close();
+            }
+        };
+    }
+</script>
